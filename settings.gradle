@@ -1,2 +1,1 @@
 include ':general'
-rootProject.name='General'
