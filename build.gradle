@@ -1,11 +1,17 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+apply plugin: 'java'
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
+
+Properties properties = new Properties()
+properties.load(project.rootProject.file("custom.properties").newDataInputStream())
+def sonatypeUsername = properties.getProperty("sonatypeUsername", "")
+def sonatypePassword = properties.getProperty("sonatypePassword", "")
 
 buildscript {
     ext.kotlin_version = '1.3.70'
     repositories {
         google()
         jcenter()
-
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:3.6.1'
@@ -21,6 +27,147 @@ allprojects {
     }
 }
 
-task clean(type: Delete) {
-    delete rootProject.buildDir
+//task clean(type: Delete) {
+//    delete rootProject.buildDir
+//}
+
+
+repositories {
+    mavenCentral()
 }
+
+test {
+    // show standard out and standard error of the test JVM(s) on the console
+    testLogging.showStandardStreams = true
+}
+
+task sourceJar(type: Jar) {
+    classifier "sources"
+    from sourceSets.main.allJava
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier "javadoc"
+    from javadoc.destinationDir
+}
+
+//artifacts {
+//    archives jar
+//    archives sourceJar
+//    archives javadocJar
+//}
+
+signing {
+//    sign configurations.archives
+    sign(publishing.publications)
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            customizePom(pom)
+            groupId 'com.github.cliuff'
+            artifactId 'general-activity-java'
+            version '1.0.1'
+
+            from components.java
+
+            // create the sign pom artifact
+//            pom.withXml {
+//                def pomFile = file("${project.buildDir}/generated-pom.xml")
+//                writeTo(pomFile)
+//                def pomAscFile = signing.sign(pomFile).signatureFiles[0]
+//                artifact(pomAscFile) {
+//                    classifier = null
+//                    extension = 'pom.asc'
+//                }
+//            }
+
+            artifact(sourceJar) {
+                classifier = 'sources'
+            }
+            artifact(javadocJar) {
+                classifier = 'javadoc'
+            }
+
+            // create the signed artifacts
+//            project.tasks.signArchives.signatureFiles.each {
+//                artifact(it) {
+//                    def matcher = it.file =~ /-(sources|javadoc)\.jar\.asc$/
+//                    if (matcher.find()) {
+//                        classifier = matcher.group(1)
+//                    } else {
+//                        classifier = null
+//                    }
+//                    extension = 'jar.asc'
+//                }
+//            }
+        }
+    }
+    repositories {
+        maven {
+            url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+            credentials {
+                username sonatypeUsername
+                password sonatypePassword
+            }
+        }
+    }
+}
+
+def customizePom(pom) {
+    pom.withXml {
+        def root = asNode()
+
+        // eliminate test-scoped dependencies (no need in maven central POMs)
+        root.dependencies.removeAll { dep ->
+            dep.scope == "test"
+        }
+
+        // add all items necessary for maven central publication
+        root.children().last() + {
+            resolveStrategy = Closure.DELEGATE_FIRST
+
+            description 'Serialize and Deserialize Json-LD into Java entities'
+            name 'Schema.org Java'
+            url 'https://github.com/cliuff/general-activity-java'
+            organization {
+                name 'com.github.cliuff'
+                url 'https://github.com/cliuff'
+            }
+            issueManagement {
+                system 'GitHub'
+                url 'https://github.com/cliuff/general-activity-java/issues'
+            }
+            licenses {
+                license {
+                    name 'Apache License 2.0'
+                    url 'https://github.com/cliuff/general-activity-java/blob/master/LICENSE'
+                    distribution 'repo'
+                }
+            }
+            scm {
+                url 'https://github.com/cliuff/general-activity-java'
+                connection 'scm:git:git://github.com/cliuff/general-activity-java.git'
+                developerConnection 'scm:git:ssh://git@github.com:cliuff/general-activity-java.git'
+            }
+            developers {
+                developer {
+                    name 'cliuff'
+                }
+            }
+        }
+    }
+}
+
+//model {
+//    tasks.generatePomFileForMavenJavaPublication {
+//        destination = file("$buildDir/generated-pom.xml")
+//    }
+//    tasks.publishMavenJavaPublicationToMavenLocal {
+//        dependsOn project.tasks.signArchives
+//    }
+//    tasks.publishMavenJavaPublicationToMavenRepository {
+//        dependsOn project.tasks.signArchives
+//    }
+//}

@@ -87,3 +87,6 @@ lint/tmp/
 
 #old rules
 .DS_Store
+
+#custom
+/custom.properties
